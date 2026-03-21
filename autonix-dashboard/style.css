@@ -65,12 +65,9 @@ html, body {
 }
 
 .nav-logo {
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.15em;
-  color: var(--accent-blue);
-  text-transform: uppercase;
+  height: 28px;
+  width: auto;
+  object-fit: contain;
 }
 
 .nav-right {
