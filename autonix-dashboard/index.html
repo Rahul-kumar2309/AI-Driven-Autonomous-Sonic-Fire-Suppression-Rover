@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AUTONIX Command Center — Real-Time Rover Dashboard</title>
+  <meta name="description" content="AUTONIX Command Center: Real-time monitoring dashboard for autonomous sonic fire suppression rover with 3D digital twin, live metrics, and ESP32-CAM vision feed.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══ NAV BAR ═══ -->
+  <nav id="nav-bar">
+    <div class="nav-logo">⬡ AUTONIX</div>
+    <div class="nav-right">
+      <div class="live-badge" id="connection-badge">
+        <span class="live-dot" id="live-dot"></span>
+        <span id="connection-text">OFFLINE</span>
+      </div>
+      <div class="utc-clock" id="utc-clock">00:00:00 IST</div>
+    </div>
+  </nav>
+
+  <!-- ═══ MAIN BODY ═══ -->
+  <main id="main-body">
+
+    <!-- LEFT COLUMN -->
+    <div id="left-column">
+
+      <!-- PANEL A — LIVE VISION FEED -->
+      <div class="panel" id="panel-vision">
+        <span class="panel-label">LIVE VISION FEED</span>
+        <div class="panel-content">
+          <img id="vision-feed"
+               src=""
+               alt="Stream offline — enter ESP32-CAM IP below"
+               style="width:100%; flex:1; object-fit:cover; border-radius:6px; display:block; background:#0a0a0a; min-height:0;">
+          <div class="vision-overlay">ESP32-CAM ● MJPEG</div>
+          <div class="cam-input-bar">
+            <input id="cam-ip-input" type="text" placeholder="http://192.168.x.x/stream">
+            <button id="cam-ip-set">SET STREAM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANEL B — 3D DIGITAL TWIN -->
+      <div class="panel" id="panel-3d">
+        <span class="panel-label">3D DIGITAL TWIN — WEBGL</span>
+        <canvas id="webgl-canvas"></canvas>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div id="right-column">
+
+      <!-- METRIC CARDS -->
+      <div id="metrics-grid">
+
+        <div class="metric-card status-nominal" id="card-freq">
+          <div class="m-name">FREQUENCY_HZ</div>
+          <div class="m-value">— Hz</div>
+          <div class="m-footer">
+            <span class="m-status">NOMINAL</span>
+            <span class="m-timestamp">--:--:--</span>
+          </div>
+        </div>
+
+        <div class="metric-card status-nominal" id="card-battery">
+          <div class="m-name">BATTERY_LEVEL</div>
+          <div class="m-value">— %</div>
+          <div class="m-footer">
+            <span class="m-status">NOMINAL</span>
+            <span class="m-timestamp">--:--:--</span>
+          </div>
+        </div>
+
+        <div class="metric-card status-nominal" id="card-flame">
+          <div class="m-name">FLAME_INTENSITY</div>
+          <div class="m-value">—</div>
+          <div class="m-footer">
+            <span class="m-status">NOMINAL</span>
+            <span class="m-timestamp">--:--:--</span>
+          </div>
+        </div>
+
+        <div class="metric-card status-nominal" id="card-radar">
+          <div class="m-name">RADAR_ANGLE</div>
+          <div class="m-value">— °</div>
+          <div class="m-footer">
+            <span class="m-status">NOMINAL</span>
+            <span class="m-timestamp">--:--:--</span>
+          </div>
+        </div>
+
+        <div class="metric-card status-nominal span-full" id="card-distance">
+          <div class="m-name">TARGET_DISTANCE_CM</div>
+          <div class="m-value">— cm</div>
+          <div class="m-footer">
+            <span class="m-status">NOMINAL</span>
+            <span class="m-timestamp">--:--:--</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ACTIVITY LOG -->
+      <div id="activity-log-panel">
+        <div class="log-header">ACTIVITY LOG</div>
+        <ul id="activity-log"></ul>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ═══ BOTTOM BAR ═══ -->
+  <footer id="bottom-bar">
+    <button class="btn btn-primary" id="btn-insert-test">INSERT TEST ROW</button>
+    <button class="btn" id="btn-fetch-all">FETCH ALL</button>
+    <button class="btn" id="btn-clear-log">CLEAR LOG</button>
+  </footer>
+
+</div>
+
+<!-- CDN: Three.js r128 -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
+  }
+}
+</script>
+
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
