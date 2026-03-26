@@ -6,8 +6,8 @@
 #pragma once
 
 // ── Wi-Fi credentials ─────────────────────────────────────────────
-#define WIFI_SSID      "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD  "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID      "rahul"
+#define WIFI_PASSWORD  "Meraname"
 
 // ── UART from Dev Kit (overlaps USB — disconnect USB when using) ──
 #define CAM_RX_PIN      3    // GPIO3 (U0RXD) — receives from Dev Kit TX

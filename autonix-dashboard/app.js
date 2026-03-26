@@ -26,9 +26,6 @@ const DOM = {
   connectionBadge:document.getElementById('connection-badge'),
   utcClock:       document.getElementById('utc-clock'),
   activityLog:    document.getElementById('activity-log'),
-  visionFeed:     document.getElementById('vision-feed'),
-  camIpInput:     document.getElementById('cam-ip-input'),
-  camIpSet:       document.getElementById('cam-ip-set'),
   btnInsertTest:  document.getElementById('btn-insert-test'),
   btnFetchAll:    document.getElementById('btn-fetch-all'),
   btnClearLog:    document.getElementById('btn-clear-log'),
@@ -59,6 +56,31 @@ const METRIC_NAMES = [
 
 // ── MAX LOG ENTRIES ───────────────────────────────────────────────
 const MAX_LOG_ENTRIES = 50;
+
+// ── FEATURE 2: WAVEFORM VISUALIZER ───────────────────────────────
+let waveformCanvas   = null;
+let waveformCtx      = null;
+let waveformFreq     = 0;       // Current Hz (0 = silent)
+let waveformCritical = false;   // true when status === 'critical'
+let waveformPhase    = 0;       // Sine wave phase — advances per frame
+let waveformAnimId   = null;    // requestAnimationFrame handle
+
+// ── FEATURE 4: AI TERMINAL ────────────────────────────────────────
+const AI_MESSAGES = {
+  idle:        '> SYSTEM NOMINAL. SCANNING ENVIRONMENT...',
+  anomaly:     '> THERMAL ANOMALY DETECTED. ANALYZING...',
+  threat:      '> THREAT CONFIRMED. CLOSING DISTANCE TO TARGET...',
+  suppressing: (hz) => `> TARGET LOCKED. DISCHARGING ACOUSTIC PULSE AT ${hz}Hz...`,
+  extinguished:'> THREAT NEUTRALIZED. RETURNING TO PATROL MODE...'
+};
+
+let aiLatestFlame = 0;
+let aiLatestFreq  = 0;
+let aiLatestDist  = 999;
+
+let typewriterTimer   = null;
+let typewriterCurrent = '';
+const TYPEWRITER_MS   = 28;
 
 // ═══════════════════════════════════════════════════════════════════
 // IST CLOCK
@@ -216,6 +238,24 @@ function handleRealtimePayload(payload) {
   ) {
     fireAlertState(data);
   }
+
+  // ── FEATURE 2: Waveform data wiring ──────────────────────────
+  if (data.metric_name === 'frequency_hz') {
+    waveformFreq     = parseFloat(data.metric_value) || 0;
+    waveformCritical = (data.status === 'critical');
+  }
+
+  // ── FEATURE 4: AI terminal data wiring ───────────────────────
+  if (data.metric_name === 'flame_intensity') {
+    aiLatestFlame = parseFloat(data.metric_value) || 0;
+  }
+  if (data.metric_name === 'frequency_hz') {
+    aiLatestFreq  = parseFloat(data.metric_value) || 0;
+  }
+  if (data.metric_name === 'target_distance_cm') {
+    aiLatestDist  = parseFloat(data.metric_value) || 999;
+  }
+  updateAIStatus();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -266,19 +306,98 @@ function startRealtimeSubscription() {
 // VISION FEED CONTROLS
 // ═══════════════════════════════════════════════════════════════════
 function setupVisionFeed() {
-  DOM.camIpSet.addEventListener('click', () => {
-    const url = DOM.camIpInput.value.trim();
-    if (url) {
-      DOM.visionFeed.src = url;
-      DOM.visionFeed.alt = 'Connecting...';
+  const camInput          = document.getElementById('cam-ip-input');
+  const setStreamBtn      = document.getElementById('set-stream-btn');
+  const disconnectBtn     = document.getElementById('disconnect-stream-btn');
+  const liveCamFeed       = document.getElementById('live-cam-feed');
+  const streamOfflineMsg  = document.getElementById('stream-offline-msg');
+  const camStatusBadge    = document.getElementById('cam-status-badge');
+
+  function setCamBadge(state) {
+    if (!camStatusBadge) return;
+    const states = {
+      offline:     { text: 'ESP32-CAM ● MJPEG',  color: '#444444' },
+      connecting:  { text: 'ESP32-CAM ◌ CONNECTING', color: '#FF6B35' },
+      live:        { text: 'ESP32-CAM ● LIVE',    color: '#00FF9C' },
+      error:       { text: 'ESP32-CAM ✕ ERROR',   color: '#FF4444' }
+    };
+    const s = states[state] || states.offline;
+    camStatusBadge.textContent = s.text;
+    camStatusBadge.style.color = s.color;
+  }
+
+  function connectStream(url) {
+    if (!url || url.trim() === '') {
+      setCamBadge('error');
+      camInput.style.borderColor = '#FF4444';
+      setTimeout(() => {
+        camInput.style.borderColor = '';
+      }, 2000);
+      return;
     }
+
+    setStreamBtn.textContent     = 'CONNECTING...';
+    setStreamBtn.disabled        = true;
+    setCamBadge('connecting');
+
+    localStorage.setItem('autonix_cam_url', url.trim());
+
+    liveCamFeed.src = url.trim();
+
+    liveCamFeed.onload = () => {
+      liveCamFeed.style.display      = 'block';
+      streamOfflineMsg.style.display = 'none';
+      disconnectBtn.style.display    = 'inline-block';
+      setStreamBtn.style.display     = 'none';
+      setCamBadge('live');
+      console.log('[STREAM] Connected:', url);
+    };
+
+    liveCamFeed.onerror = () => {
+      liveCamFeed.style.display      = 'none';
+      streamOfflineMsg.style.display = 'flex';
+      setStreamBtn.textContent       = 'SET STREAM';
+      setStreamBtn.disabled          = false;
+      disconnectBtn.style.display    = 'none';
+      setStreamBtn.style.display     = 'inline-block';
+      setCamBadge('error');
+      console.warn('[STREAM] Failed to connect:', url);
+    };
+  }
+
+  function disconnectStream() {
+    liveCamFeed.src                = '';
+    liveCamFeed.style.display      = 'none';
+    streamOfflineMsg.style.display = 'flex';
+    disconnectBtn.style.display    = 'none';
+    setStreamBtn.style.display     = 'inline-block';
+    setStreamBtn.textContent       = 'SET STREAM';
+    setStreamBtn.disabled          = false;
+    setCamBadge('offline');
+
+    localStorage.removeItem('autonix_cam_url');
+    camInput.value = '';
+
+    console.log('[STREAM] Disconnected');
+  }
+
+  setStreamBtn.addEventListener('click', () => {
+    connectStream(camInput.value);
   });
 
-  DOM.camIpInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      DOM.camIpSet.click();
-    }
+  camInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') connectStream(camInput.value);
   });
+
+  disconnectBtn.addEventListener('click', () => {
+    disconnectStream();
+  });
+
+  const savedStreamURL = localStorage.getItem('autonix_cam_url');
+  if (savedStreamURL) {
+    camInput.value = savedStreamURL;
+    connectStream(savedStreamURL);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -320,6 +439,124 @@ function setupBottomBar() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// FEATURE 2: LIVE AUDIO WAVEFORM VISUALIZER
+// ═══════════════════════════════════════════════════════════════════
+function initWaveform() {
+  waveformCanvas = document.getElementById('audio-waveform');
+  if (!waveformCanvas) return;
+  waveformCtx = waveformCanvas.getContext('2d');
+  animateWaveform();
+}
+
+function animateWaveform() {
+  waveformAnimId = requestAnimationFrame(animateWaveform);
+
+  const ctx = waveformCtx;
+  const W   = waveformCanvas.width;
+  const H   = waveformCanvas.height;
+  const cx  = H / 2;
+
+  // Trail effect — not a full clear
+  ctx.fillStyle = 'rgba(5, 5, 5, 0.88)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.beginPath();
+  ctx.lineWidth = 1.5;
+
+  if (waveformFreq === 0) {
+    // SILENT: flat faint blue centre line
+    ctx.strokeStyle = 'rgba(0, 191, 255, 0.18)';
+    ctx.moveTo(0, cx);
+    ctx.lineTo(W, cx);
+  } else {
+    // ACTIVE: animated sine wave
+    ctx.strokeStyle = waveformCritical ? '#FF4444' : '#00BFFF';
+
+    // Amplitude: 6px at 30Hz → 16px at 60Hz
+    const amplitude = 6 + ((waveformFreq - 30) / 30) * 10;
+
+    // Phase advances faster at higher Hz
+    waveformPhase += waveformFreq * 0.003;
+
+    // Visible cycles scale with Hz
+    const cycles = waveformFreq / 30;
+
+    for (let x = 0; x < W; x++) {
+      const y = cx + amplitude *
+        Math.sin((x / W) * Math.PI * 2 * cycles + waveformPhase);
+      if (x === 0) ctx.moveTo(x, y);
+      else          ctx.lineTo(x, y);
+    }
+  }
+
+  ctx.stroke();
+
+  // Frequency label — bottom-right corner
+  ctx.font      = '9px JetBrains Mono, monospace';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = waveformFreq > 0
+    ? (waveformCritical ? 'rgba(255,68,68,0.7)' : 'rgba(0,191,255,0.6)')
+    : 'rgba(0,191,255,0.15)';
+  ctx.fillText(
+    waveformFreq > 0 ? `${waveformFreq}Hz ACTIVE` : 'SILENT',
+    W - 4,
+    H - 4
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 4: AI STATUS TERMINAL (TYPEWRITER)
+// ═══════════════════════════════════════════════════════════════════
+function typeMessage(message, isCritical = false) {
+  clearTimeout(typewriterTimer);
+
+  const textEl = document.getElementById('ai-status-text');
+  const barEl  = document.getElementById('ai-terminal-bar');
+  if (!textEl || !barEl) return;
+
+  // Guard: same message already fully typed — skip
+  if (typewriterCurrent === message && textEl.textContent === message) return;
+
+  typewriterCurrent  = message;
+  textEl.textContent = '';
+  let charIndex      = 0;
+
+  if (isCritical) barEl.classList.add('critical');
+  else             barEl.classList.remove('critical');
+
+  function typeNextChar() {
+    if (charIndex < message.length) {
+      textEl.textContent += message[charIndex];
+      charIndex++;
+      typewriterTimer = setTimeout(typeNextChar, TYPEWRITER_MS);
+    } else {
+      // Fully typed — loop to idle after 8s if not critical
+      if (!isCritical) {
+        typewriterTimer = setTimeout(() => {
+          if (typewriterCurrent === message) {
+            typeMessage(AI_MESSAGES.idle, false);
+          }
+        }, 8000);
+      }
+    }
+  }
+
+  typeNextChar();
+}
+
+function updateAIStatus() {
+  if (aiLatestFreq > 0) {
+    typeMessage(AI_MESSAGES.suppressing(aiLatestFreq), true);
+  } else if (aiLatestFlame > 60) {
+    typeMessage(AI_MESSAGES.threat, true);
+  } else if (aiLatestFlame > 20) {
+    typeMessage(AI_MESSAGES.anomaly, false);
+  } else {
+    typeMessage(AI_MESSAGES.idle, false);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════════════
 function boot() {
@@ -329,6 +566,8 @@ function boot() {
   initThreeScene();
   loadInitialData();
   startRealtimeSubscription();
+  initWaveform();                           // Feature 2
+  typeMessage(AI_MESSAGES.idle, false);     // Feature 4
   console.log('[AUTONIX] Command Center initialized.');
 }
 

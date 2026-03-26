@@ -14,6 +14,13 @@
   <!-- ═══ NAV BAR ═══ -->
   <nav id="nav-bar">
     <img src="assets/logo.png" class="nav-logo" alt="AUTONIX Logo">
+
+    <!-- ═ AI STATUS TERMINAL ═ -->
+    <div id="ai-terminal-bar">
+      <span id="ai-status-text"></span>
+      <span id="ai-cursor">█</span>
+    </div>
+
     <div class="nav-right">
       <div class="live-badge" id="connection-badge">
         <span class="live-dot" id="live-dot"></span>
@@ -33,14 +40,43 @@
       <div class="panel" id="panel-vision">
         <span class="panel-label">LIVE VISION FEED</span>
         <div class="panel-content">
-          <img id="vision-feed"
-               src=""
-               alt="Stream offline — enter ESP32-CAM IP below"
-               style="width:100%; flex:1; object-fit:cover; border-radius:6px; display:block; background:#0a0a0a; min-height:0;">
-          <div class="vision-overlay">ESP32-CAM ● MJPEG</div>
+          <img
+            id="live-cam-feed"
+            src=""
+            alt=""
+            style="width:100%; height:100%;
+                   object-fit:cover;
+                   border-radius:4px;
+                   display:none;">
+          <div id="stream-offline-msg"
+               style="position:absolute; inset:0;
+                      display:flex; flex-direction:column;
+                      align-items:center; justify-content:center;
+                      gap:8px; pointer-events:none;">
+            <span style="font-size:11px;
+                         font-family:'JetBrains Mono',monospace;
+                         color:#444444;
+                         letter-spacing:0.1em;">
+              STREAM OFFLINE
+            </span>
+            <span style="font-size:10px;
+                         font-family:'JetBrains Mono',monospace;
+                         color:#2a2a2a;">
+              ENTER ESP32-CAM IP BELOW
+            </span>
+          </div>
+          <div class="vision-overlay" id="cam-status-badge">ESP32-CAM ● MJPEG</div>
           <div class="cam-input-bar">
-            <input id="cam-ip-input" type="text" placeholder="http://192.168.x.x/stream">
-            <button id="cam-ip-set">SET STREAM</button>
+            <input
+              type="text"
+              id="cam-ip-input"
+              placeholder="http://192.168.x.x:81/stream"
+              autocomplete="off"
+              spellcheck="false">
+            <button id="set-stream-btn">SET STREAM</button>
+            <button id="disconnect-stream-btn" style="display:none;">
+              DISCONNECT
+            </button>
           </div>
         </div>
       </div>
@@ -49,6 +85,16 @@
       <div class="panel" id="panel-3d">
         <span class="panel-label">3D DIGITAL TWIN — WEBGL</span>
         <canvas id="webgl-canvas"></canvas>
+
+        <!-- ── TELEMETRY LEGEND ── -->
+        <div class="telemetry-legend">
+          <div class="legend-title">TELEMETRY KEY</div>
+          <div class="legend-item"><span class="color-box bg-blue"></span> 3D RADAR / SAFE</div>
+          <div class="legend-item"><span class="color-box bg-orange"></span> FLAME INTENSITY / WARNING</div>
+          <div class="legend-item"><span class="color-box bg-red"></span> CRITICAL ALERT / FIRE</div>
+          <div class="legend-item"><span class="color-box bg-green"></span> BATTERY LEVEL</div>
+          <div class="legend-item"><span class="icon-box">◩</span> OBSTACLE TRACKED</div>
+        </div>
       </div>
 
     </div>
@@ -66,6 +112,13 @@
             <span class="m-status">NOMINAL</span>
             <span class="m-timestamp">--:--:--</span>
           </div>
+          <!-- Live audio waveform -->
+          <canvas
+            id="audio-waveform"
+            width="240"
+            height="48"
+            style="width:100%;height:48px;display:block;margin-top:8px;border-radius:4px;background:#050505;">
+          </canvas>
         </div>
 
         <div class="metric-card status-nominal" id="card-battery">
