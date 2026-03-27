@@ -170,10 +170,9 @@ html, body {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   background-color: #050505;
   min-height: 0;
+  overflow: hidden;
 }
 
 #vision-feed {
@@ -188,7 +187,7 @@ html, body {
 
 .vision-overlay {
   position: absolute;
-  bottom: 46px;
+  bottom: 10px;
   left: 10px;
   font-family: var(--font-mono);
   font-size: 9px;
@@ -205,6 +204,7 @@ html, body {
   padding: 8px 10px;
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-card);
+  flex-shrink: 0;
 }
 
 #cam-ip-input {
@@ -608,14 +608,17 @@ html, body {
 }
 
 #live-cam-feed {
+  flex:         1;
+  min-height:   0;
+  width:        100%;
   max-width:    100%;
   max-height:   100%;
   aspect-ratio: 4 / 3;
   object-fit:   contain;
   object-position: center;
   background:   #050505;
-  border-radius:4px;
-  display:      none;
+  border-radius:4px 4px 0 0;
+  display:      block;
 }
 
 #stream-offline-msg {

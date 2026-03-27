@@ -54,6 +54,22 @@ static esp_err_t stream_handler(httpd_req_t* req) {
   return res;
 }
 
+// ─ Single JPEG capture endpoint — used by Python edge server ────────
+// Returns ONE frame as image/jpeg then closes. Non-blocking for browser.
+static esp_err_t capture_handler(httpd_req_t* req) {
+  camera_fb_t* fb = esp_camera_fb_get();
+  if (!fb) {
+    httpd_resp_send_500(req);
+    return ESP_FAIL;
+  }
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store");
+  httpd_resp_set_type(req, "image/jpeg");
+  esp_err_t res = httpd_resp_send(req, (const char*)fb->buf, fb->len);
+  esp_camera_fb_return(fb);
+  return res;
+}
+
 void initCamera() {
   camera_config_t cam_config;
   cam_config.ledc_channel = LEDC_CHANNEL_0;
@@ -119,8 +135,14 @@ void startStreamServer() {
   httpd_uri_t stream_uri = {
     .uri = "/stream", .method = HTTP_GET, .handler = stream_handler, .user_ctx = NULL
   };
+  // Single-frame capture endpoint for Python AI edge server
+  httpd_uri_t capture_uri = {
+    .uri = "/capture", .method = HTTP_GET, .handler = capture_handler, .user_ctx = NULL
+  };
   if (httpd_start(&stream_httpd, &config) == ESP_OK) {
     httpd_register_uri_handler(stream_httpd, &stream_uri);
+    httpd_register_uri_handler(stream_httpd, &capture_uri);
+    Serial.println("CAM:Capture URL: http://" + WiFi.localIP().toString() + "/capture");
   }
 }
 

@@ -65,7 +65,8 @@ class HSVFireDetector:
         self.lower_orange = np.array(HSV_LOWER_ORANGE, dtype=np.uint8)
         self.upper_orange = np.array(HSV_UPPER_ORANGE, dtype=np.uint8)
 
-        self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        # Small kernel (3x3) — 5x5 MORPH_OPEN destroys matchstick-sized blobs
+        self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         logger.info("HSV Fire Detector initialized.")
 
     def detect(self, frame: np.ndarray) -> FireDetection:
@@ -83,10 +84,11 @@ class HSVFireDetector:
         combined    = cv2.bitwise_or(mask_red1, mask_red2)
         combined    = cv2.bitwise_or(combined,  mask_orange)
 
-        # 3. Morphological open → close → dilate
-        combined = cv2.morphologyEx(combined, cv2.MORPH_OPEN,  self.kernel)
+        # 3. Morphological filter
+        #    Skip MORPH_OPEN — it erases blobs smaller than kernel²
+        #    matchstick flames are tiny; only close + dilate to fill gaps
         combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, self.kernel)
-        combined = cv2.dilate(combined, self.kernel, iterations=1)
+        combined = cv2.dilate(combined, self.kernel, iterations=2)
 
         # 4. External contours
         contours, _ = cv2.findContours(

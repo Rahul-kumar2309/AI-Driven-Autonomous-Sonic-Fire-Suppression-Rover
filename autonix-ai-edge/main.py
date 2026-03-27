@@ -18,6 +18,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import requests
 from colorama import Fore, Style, init as colorama_init
 from flask import Flask, Response
 
@@ -113,6 +114,98 @@ def health():
     return {"status": "ok", "service": "AUTONIX AI Edge"}, 200
 
 
+# ═══════════════════════════════════════════════════════════════
+# MJPEG CAPTURE — requests-based reader for ESP32-CAM
+# cv2.VideoCapture cannot reliably read HTTP MJPEG from ESP32-CAM:
+# isOpened() returns True but cap.read() returns False for every frame.
+# This class manually finds JPEG markers and decodes with imdecode.
+# ═══════════════════════════════════════════════════════════════
+
+class MjpegCapture:
+    """
+    Requests-based MJPEG frame reader.
+    Drop-in replacement for cv2.VideoCapture for HTTP MJPEG streams.
+    Supports auto-reconnect after stream loss.
+    """
+
+    JPEG_START = b'\xff\xd8'
+    JPEG_END   = b'\xff\xd9'
+
+    def __init__(self, url: str, timeout: int = 10):
+        self.url     = url
+        self.timeout = timeout
+        self._resp   = None
+        self._buf    = b''
+        self._iter   = None
+        self._log    = logging.getLogger('mjpeg_cap')
+        self._opened = self._connect()
+
+    def _connect(self) -> bool:
+        try:
+            self._resp = requests.get(
+                self.url,
+                stream=True,
+                timeout=self.timeout,
+                headers={'Connection': 'keep-alive'}
+            )
+            self._resp.raise_for_status()
+            self._iter = self._resp.iter_content(chunk_size=4096)
+            self._buf  = b''
+            self._log.info('MJPEG stream connected: %s', self.url)
+            return True
+        except Exception as exc:
+            self._log.warning('MJPEG connect failed: %s', exc)
+            self._resp = None
+            self._iter = None
+            return False
+
+    def isOpened(self) -> bool:
+        return self._opened
+
+    def read(self):
+        """Read one JPEG frame. Returns (True, frame) or (False, None)."""
+        # Try reconnect if stream lost
+        if self._iter is None:
+            if not self._connect():
+                time.sleep(1.0)
+                return False, None
+
+        try:
+            # Accumulate chunks until we find a complete JPEG
+            for chunk in self._iter:
+                self._buf += chunk
+
+                # Find JPEG boundaries
+                start = self._buf.find(self.JPEG_START)
+                end   = self._buf.find(self.JPEG_END)
+
+                if start != -1 and end != -1 and end > start:
+                    jpg  = self._buf[start : end + 2]
+                    self._buf = self._buf[end + 2:]  # keep remainder
+
+                    frame = cv2.imdecode(
+                        np.frombuffer(jpg, dtype=np.uint8),
+                        cv2.IMREAD_COLOR
+                    )
+                    if frame is not None:
+                        return True, frame
+
+        except Exception as exc:
+            self._log.warning('MJPEG read error: %s — reconnecting…', exc)
+            self._resp = None
+            self._iter = None
+            time.sleep(1.0)
+
+        return False, None
+
+    def release(self):
+        if self._resp is not None:
+            try:
+                self._resp.close()
+            except Exception:
+                pass
+
+
 # ═══════════════════════════════════════════════════════════════════
 # LOGGING SETUP
 # ═══════════════════════════════════════════════════════════════════
@@ -149,27 +242,32 @@ def setup_logging() -> logging.Logger:
 # CAMERA OPEN
 # ═══════════════════════════════════════════════════════════════════
 
-def open_camera() -> cv2.VideoCapture:
+def open_camera():
     """Open webcam or ESP32-CAM based on CAMERA_MODE."""
     logger = logging.getLogger("camera")
     if CAMERA_MODE == "WEBCAM":
         logger.info("%sOpening local webcam (index 0)…%s", Fore.CYAN, Style.RESET_ALL)
         cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            logger.critical(
+                "%sFailed to open webcam. Exiting.%s",
+                Fore.RED, Style.RESET_ALL,
+            )
+            sys.exit(1)
+        return cap
     else:
         logger.info(
-            "%sOpening ESP32-CAM stream: %s%s",
+            "%sOpening ESP32-CAM via requests MJPEG reader: %s%s",
             Fore.CYAN, ESP32_CAM_STREAM_URL, Style.RESET_ALL,
         )
-        cap = cv2.VideoCapture(ESP32_CAM_STREAM_URL)
-
-    if not cap.isOpened():
-        logger.critical(
-            "%sFailed to open camera (%s). Exiting.%s",
-            Fore.RED, CAMERA_MODE, Style.RESET_ALL,
-        )
-        sys.exit(1)
-
-    return cap
+        cap = MjpegCapture(ESP32_CAM_STREAM_URL, timeout=15)
+        if not cap.isOpened():
+            logger.critical(
+                "%sFailed to connect to ESP32-CAM stream (%s). Exiting.%s",
+                Fore.RED, ESP32_CAM_STREAM_URL, Style.RESET_ALL,
+            )
+            sys.exit(1)
+        return cap
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -502,11 +600,14 @@ def main():
             with frame_lock:
                 output_frame = display.copy()
 
-            # ── STEP 11: LOCAL WINDOW ─────────────────────────────
-            cv2.imshow("AUTONIX — Fire Detection", display)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                logger.info("User pressed 'q' — exiting.")
-                break
+            # ── STEP 11: LOCAL WINDOW (safe fallback if no GUI) ───
+            try:
+                cv2.imshow("AUTONIX \u2014 Fire Detection", display)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    logger.info("User pressed 'q' \u2014 exiting.")
+                    break
+            except Exception:
+                pass  # No display available \u2014 headless mode OK
 
     except Exception as exc:
         logger.critical("Unhandled exception: %s", exc, exc_info=True)

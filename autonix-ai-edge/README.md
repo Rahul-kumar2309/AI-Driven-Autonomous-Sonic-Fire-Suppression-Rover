@@ -28,7 +28,7 @@ source autonix-env/bin/activate
 ```
 
 **Windows:**
-```bash
+```bashl
 python -m venv autonix-env
 autonix-env\Scripts\activate
 ```

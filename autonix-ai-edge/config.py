@@ -14,7 +14,7 @@ DEVICE_ID          = "rover_01"
 #   "WEBCAM"   → cv2.VideoCapture(0)
 #   "ESP32CAM" → cv2.VideoCapture(ESP32_CAM_STREAM_URL)
 CAMERA_MODE          = "ESP32CAM"
-ESP32_CAM_STREAM_URL = "http://10.122.223.237/stream"
+ESP32_CAM_STREAM_URL = "http://10.122.223.237/capture"  # /capture = single JPEG, doesn't block browser /stream
 
 # ── FLASK MJPEG STREAMER ──────────────────────────────────────────
 #   Dashboard uses: <img src="http://localhost:5000/video_feed">
@@ -28,13 +28,14 @@ ESP32_BAUD_RATE    = 115200
 SERIAL_ENABLED     = True                 # False if ESP32 not connected
 
 # ── HSV FIRE COLOR RANGES ─────────────────────────────────────────
-HSV_LOWER_1        = (0,   120, 100)      # Red-low hue start
-HSV_UPPER_1        = (15,  255, 255)      # Red-low hue end
-HSV_LOWER_2        = (160, 120, 100)      # Red-high (wrap) start
+# Tuned for small flame detection (matchstick / lighter scale)
+HSV_LOWER_1        = (0,   60,  80)       # Red-low: lower sat+val for small flames
+HSV_UPPER_1        = (18,  255, 255)      # Red-low hue end (extended to 18)
+HSV_LOWER_2        = (155, 60,  80)       # Red-high (wrap) — lowered sat
 HSV_UPPER_2        = (180, 255, 255)      # Red-high (wrap) end
-HSV_LOWER_ORANGE   = (15,  120, 100)      # Orange/yellow start
-HSV_UPPER_ORANGE   = (35,  255, 255)      # Orange/yellow end
-HSV_MIN_CONTOUR_AREA = 300                # Min px² to count as fire
+HSV_LOWER_ORANGE   = (18,  60,  80)       # Orange/yellow — extended range
+HSV_UPPER_ORANGE   = (40,  255, 255)      # Yellow end (40 covers pure yellow)
+HSV_MIN_CONTOUR_AREA = 50                 # Min px² — 50 catches matchstick flames
 
 # ── YOLO FALLBACK ──────────────────────────────────────────────────
 YOLO_FALLBACK_THRESHOLD = 0.4             # HSV conf below this → YOLO
@@ -50,7 +51,7 @@ FREQ_MAX             = 60                 # Hz — maximum tone
 # ── STATUS THRESHOLDS ──────────────────────────────────────────────
 INTENSITY_NOMINAL    = 20.0               # below 20 → 'nominal'
 INTENSITY_WARNING    = 60.0               # 20–60 → 'warning', above 60 → 'critical'
-FIRE_CONFIRM_FRAMES  = 3                  # consecutive frames required
+FIRE_CONFIRM_FRAMES  = 2                  # consecutive frames required (2 = faster response)
 
 # ── SIMULATION (when hardware unavailable) ─────────────────────────
 SIMULATE_RADAR       = True               # Sweeps radar_angle 0→180→0

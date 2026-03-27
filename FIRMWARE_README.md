@@ -29,7 +29,10 @@
                                                         │
                                                         ▼
                                               [Dashboard Browser]
-                                          http://{CAM_IP}/stream
+                                           http://{CAM_IP}/stream
+
+                                              [Python AI Server]
+                                           http://{CAM_IP}/capture
 ```
 
 ---
@@ -183,9 +186,11 @@ Edit `autonix_cam/config.h` before uploading:
 After boot, the CAM will print:
 ```
 CAM:Stream URL: http://192.168.x.x/stream
+CAM:Capture URL: http://192.168.x.x/capture
 ```
 
-Use that URL in the dashboard or Python edge server.
+Use `/stream` inside the dashboard's SET STREAM bar.
+Use `/capture` inside the Python edge server's `config.py`.
 
 ---
 
@@ -194,7 +199,7 @@ Use that URL in the dashboard or Python edge server.
 - [ ] Dev Kit Serial Monitor shows `STATUS:AUTONIX Dev Kit -- Ready`
 - [ ] OLED shows "AUTONIX / INSNAPERZ" splash then live data
 - [ ] Servo sweeps 0°→180°→0° continuously in IDLE state
-- [ ] ESP32-CAM prints `CAM:Stream URL: http://...` to Serial Monitor
+- [ ] ESP32-CAM prints dual URLs to Serial Monitor
 - [ ] Stream accessible at `http://{CAM_IP}/stream` in browser
 - [ ] Sending `SET_FREQ:42` from Serial Monitor → Dev Kit fires weapon at 42Hz
 - [ ] Speaker emits audible tone when SET_FREQ command received

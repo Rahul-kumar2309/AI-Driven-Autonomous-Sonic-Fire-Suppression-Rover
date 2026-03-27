@@ -39,7 +39,10 @@
       <!-- PANEL A — LIVE VISION FEED -->
       <div class="panel" id="panel-vision">
         <span class="panel-label">LIVE VISION FEED</span>
+
+        <!-- VIDEO AREA: fills all space above the input bar -->
         <div class="panel-content">
+          <!-- img is ALWAYS display:block. Offline overlay covers it via z-index -->
           <img
             id="live-cam-feed"
             src=""
@@ -50,14 +53,13 @@
               object-fit:       contain;
               object-position:  center center;
               background-color: #050505;
-              border-radius:    4px;
-              display:          none;
+              border-radius:    4px 4px 0 0;
+              display:          block;
+              position:         relative;
+              z-index:          0;
             ">
-          <div id="stream-offline-msg"
-               style="position:absolute; inset:0;
-                      display:flex; flex-direction:column;
-                      align-items:center; justify-content:center;
-                      gap:8px; pointer-events:none;">
+          <!-- Offline overlay: covers img via z-index:2. Hidden when streaming. -->
+          <div id="stream-offline-msg" style="z-index:2;">
             <span style="font-size:11px;
                          font-family:'JetBrains Mono',monospace;
                          color:#444444;
@@ -70,21 +72,25 @@
               ENTER ESP32-CAM IP BELOW
             </span>
           </div>
-          <div class="vision-overlay" id="cam-status-badge">ESP32-CAM ● MJPEG</div>
-          <div class="cam-input-bar">
-            <input
-              type="text"
-              id="cam-ip-input"
-              placeholder="http://192.168.x.x:81/stream"
-              autocomplete="off"
-              spellcheck="false">
-            <button id="set-stream-btn">SET STREAM</button>
-            <button id="disconnect-stream-btn" style="display:none;">
-              DISCONNECT
-            </button>
-          </div>
+          <div class="vision-overlay" id="cam-status-badge" style="z-index:3;">ESP32-CAM ● MJPEG</div>
         </div>
+
+        <!-- INPUT BAR: direct child of panel — NEVER clipped, always visible -->
+        <div class="cam-input-bar">
+          <input
+            type="text"
+            id="cam-ip-input"
+            placeholder="http://10.122.223.237/stream"
+            autocomplete="off"
+            spellcheck="false">
+          <button id="set-stream-btn">SET STREAM</button>
+          <button id="disconnect-stream-btn" style="display:none;">
+            DISCONNECT
+          </button>
+        </div>
+
       </div>
+
 
       <!-- PANEL B — 3D DIGITAL TWIN -->
       <div class="panel" id="panel-3d">
@@ -194,6 +200,120 @@
 </script>
 
 <script type="module" src="app.js"></script>
+
+<!--
+  MJPEG STREAM CONTROLLER
+  =======================
+  img.onload NEVER fires for MJPEG (infinite HTTP stream).
+  This script COMPLETELY OWNS stream connect/disconnect logic.
+  It intercepts the SET STREAM button at capture phase (runs
+  BEFORE app.js sees the click) and directly manages visibility.
+  No dependency on app.js onload callback whatsoever.
+-->
+<script>
+(function () {
+  function initMjpegController() {
+    var img        = document.getElementById('live-cam-feed');
+    var offlineMsg = document.getElementById('stream-offline-msg');
+    var badge      = document.getElementById('cam-status-badge');
+    var setBtn     = document.getElementById('set-stream-btn');
+    var discBtn    = document.getElementById('disconnect-stream-btn');
+    var camInput   = document.getElementById('cam-ip-input');
+    if (!img || !setBtn || !camInput) return;
+
+    /* ── SHOW STREAM ── */
+    function showStream(url) {
+      if (!url || url.trim() === '') return;
+      var cleanUrl = url.trim();
+
+      /* Set src — browser immediately starts loading MJPEG frames */
+      img.src = cleanUrl;
+
+      /* Show feed, hide overlay — no waiting for onload */
+      offlineMsg.style.display  = 'none';
+      img.style.visibility      = 'visible';
+      img.style.opacity         = '1';
+
+      /* Update buttons */
+      setBtn.style.display      = 'none';
+      discBtn.style.display     = 'inline-block';
+
+      /* Update badge */
+      badge.textContent         = 'ESP32-CAM \u25CF LIVE';
+      badge.style.color         = '#00FF9C';
+
+      /* Save to localStorage so app.js auto-restore also works */
+      try { localStorage.setItem('autonix_cam_url', cleanUrl); } catch(e) {}
+    }
+
+    /* ── HIDE STREAM ── */
+    function hideStream() {
+      img.src                   = '';
+      offlineMsg.style.display  = 'flex';
+      setBtn.style.display      = 'inline-block';
+      setBtn.textContent        = 'SET STREAM';
+      setBtn.disabled           = false;
+      discBtn.style.display     = 'none';
+      badge.textContent         = 'ESP32-CAM \u25CF MJPEG';
+      badge.style.color         = '#444444';
+      try { localStorage.removeItem('autonix_cam_url'); } catch(e) {}
+    }
+
+    /* ── SET STREAM button — capture phase (runs before app.js) ── */
+    setBtn.addEventListener('click', function (e) {
+      e.stopImmediatePropagation();  /* prevent app.js handler */
+      showStream(camInput.value);
+    }, true);
+
+    /* ── DISCONNECT button — capture phase ── */
+    discBtn.addEventListener('click', function (e) {
+      e.stopImmediatePropagation();
+      hideStream();
+    }, true);
+
+    /* ── Enter key in input ── */
+    camInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.stopImmediatePropagation();
+        showStream(camInput.value);
+      }
+    }, true);
+
+    /* ── Auto-restore saved URL (also handles app.js localStorage restore) ── */
+    var saved = '';
+    try { saved = localStorage.getItem('autonix_cam_url') || ''; } catch(e) {}
+    if (saved) {
+      camInput.value = saved;
+      /* Small delay so DOM is fully painted before showing stream */
+      setTimeout(function () { showStream(saved); }, 300);
+    }
+
+    /* ── MutationObserver: catch app.js setting img.src directly ── */
+    var _obs = new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        if (m.attributeName === 'src') {
+          var src = img.getAttribute('src');
+          if (src && src.trim() !== '') {
+            offlineMsg.style.display = 'none';
+            badge.textContent        = 'ESP32-CAM \u25CF LIVE';
+            badge.style.color        = '#00FF9C';
+          } else {
+            offlineMsg.style.display = 'flex';
+          }
+        }
+      });
+    });
+    _obs.observe(img, { attributes: true, attributeFilter: ['src'] });
+  }
+
+  /* Run after DOM is ready */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMjpegController);
+  } else {
+    initMjpegController();
+  }
+})();
+</script>
 
 </body>
 </html>

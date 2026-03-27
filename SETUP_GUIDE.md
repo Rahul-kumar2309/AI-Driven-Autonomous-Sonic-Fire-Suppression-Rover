@@ -1,7 +1,7 @@
 # 🤖 AUTONIX — Autonomous Sonic Fire Suppression Rover
 ### Complete Setup Guide
 
-This is the master setup guide for the entire AUTONIX project by **Team INSNAPERZ**. Follow every section in order and you will have the full system running on a new machine from scratch.
+This is the master setup guide for the entire AUTONIX project by **Sparcs**. Follow every section in order and you will have the full system running on a new machine from scratch.
 
 ---
 
@@ -276,9 +276,9 @@ In `autonix-ai-edge/config.py`:
 | Testing with laptop webcam | `CAMERA_MODE = "WEBCAM"` |
 | Using ESP32-CAM over Wi-Fi | `CAMERA_MODE = "ESP32CAM"` |
 
-If using ESP32-CAM, also set its IP address:
+If using ESP32-CAM, also set its IP address (use /capture here!):
 ```python
-ESP32_CAM_STREAM_URL = "http://192.168.x.x/stream"
+ESP32_CAM_STREAM_URL = "http://192.168.x.x/capture"
 ```
 
 ### 4.4 — Configure Serial Port (ESP32 Dev Kit)
@@ -311,7 +311,7 @@ python main.py
 2. Find the **LIVE VISION FEED** panel on the left
 3. In the input box at the bottom, type the stream URL:
    - **AI Edge Server**: `http://localhost:5000/video_feed`
-   - **Direct ESP32-CAM**: `http://192.168.x.x:81/stream`
+   - **Direct ESP32-CAM**: `http://192.168.x.x/stream`
 4. Click **SET STREAM**
 
 ✅ The dashboard will now show the live annotated fire detection video feed!
@@ -425,4 +425,4 @@ git push origin main
 
 ---
 
-*Built by Team INSNAPERZ — AUTONIX Autonomous Sonic Fire Suppression Rover*
+*Built by Team Sparcs — AUTONIX Autonomous Sonic Fire Suppression Rover*
