@@ -13,8 +13,8 @@ DEVICE_ID          = "rover_01"
 # ── CAMERA MODE ────────────────────────────────────────────────────
 #   "WEBCAM"   → cv2.VideoCapture(0)
 #   "ESP32CAM" → cv2.VideoCapture(ESP32_CAM_STREAM_URL)
-CAMERA_MODE          = "WEBCAM"
-ESP32_CAM_STREAM_URL = "http://192.168.1.100/stream"
+CAMERA_MODE          = "ESP32CAM"
+ESP32_CAM_STREAM_URL = "http://10.122.223.237/stream"
 
 # ── FLASK MJPEG STREAMER ──────────────────────────────────────────
 #   Dashboard uses: <img src="http://localhost:5000/video_feed">
@@ -22,7 +22,8 @@ FLASK_HOST = "0.0.0.0"
 FLASK_PORT = 5000
 
 # ── ESP32 DEV KIT SERIAL / UART ───────────────────────────────────
-ESP32_SERIAL_PORT  = "/dev/ttyUSB0"       # Windows: "COM3"
+#ESP32_SERIAL_PORT  = "/dev/ttyUSB0"       # Windows: "COM3"
+ESP32_SERIAL_PORT  = "COM5" 
 ESP32_BAUD_RATE    = 115200
 SERIAL_ENABLED     = True                 # False if ESP32 not connected
 

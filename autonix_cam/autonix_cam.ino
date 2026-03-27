@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════════════
-// autonix_cam.ino — AUTONIX Vision Node (ESP32-CAM AI Thinker)
-// Streams MJPEG video over Wi-Fi at http://{IP}/stream
-// Listens on UART for trigger messages from Dev Kit.
-// Team: INSNAPERZ
-// ═══════════════════════════════════════════════════════════════════
-
 #include "esp_camera.h"
 #include <WiFi.h>
 #include "esp_http_server.h"
@@ -29,127 +22,77 @@
 #define PCLK_GPIO_NUM    22
 
 static httpd_handle_t stream_httpd = NULL;
-
-// ── MJPEG boundary string ─────────────────────────────────────────
-static const char* BOUNDARY      = "--frame";
 static const char* CONTENT_TYPE  = "multipart/x-mixed-replace; boundary=frame";
-static const char* FRAME_HEADER  =
-  "--frame\r\nContent-Type: image/jpeg\r\n\r\n";
+static const char* FRAME_HEADER  = "--frame\r\nContent-Type: image/jpeg\r\n\r\n";
 static const char* FRAME_FOOTER  = "\r\n";
 
-// ─────────────────────────────────────────────────────────────────
-// MJPEG STREAM HANDLER
-// ─────────────────────────────────────────────────────────────────
 static esp_err_t stream_handler(httpd_req_t* req) {
-  esp_err_t res;
-
-  // Set MJPEG response headers
-  res = httpd_resp_set_type(req, CONTENT_TYPE);
+  esp_err_t res = httpd_resp_set_type(req, CONTENT_TYPE);
   if (res != ESP_OK) return res;
 
-  // Disable caching for live stream
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
   httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store");
 
   while (true) {
-    // Capture a JPEG frame from camera
     camera_fb_t* fb = esp_camera_fb_get();
     if (!fb) {
       Serial.println("CAM:Frame capture failed");
       res = ESP_FAIL;
       break;
     }
-
-    // Send boundary + content-type header
     res = httpd_resp_send_chunk(req, FRAME_HEADER, strlen(FRAME_HEADER));
-    if (res != ESP_OK) {
-      esp_camera_fb_return(fb);
-      break;
-    }
+    if (res != ESP_OK) { esp_camera_fb_return(fb); break; }
 
-    // Send JPEG frame bytes
     res = httpd_resp_send_chunk(req, (const char*)fb->buf, fb->len);
-    esp_camera_fb_return(fb); // Always return the buffer
+    esp_camera_fb_return(fb); 
     if (res != ESP_OK) break;
 
-    // Send frame footer
     res = httpd_resp_send_chunk(req, FRAME_FOOTER, strlen(FRAME_FOOTER));
     if (res != ESP_OK) break;
   }
-
-  // End chunked response
   httpd_resp_send_chunk(req, NULL, 0);
   return res;
 }
 
-// ─────────────────────────────────────────────────────────────────
-// CAMERA INITIALIZATION
-// ─────────────────────────────────────────────────────────────────
 void initCamera() {
   camera_config_t cam_config;
-
   cam_config.ledc_channel = LEDC_CHANNEL_0;
   cam_config.ledc_timer   = LEDC_TIMER_0;
-  cam_config.pin_d0       = Y2_GPIO_NUM;
-  cam_config.pin_d1       = Y3_GPIO_NUM;
-  cam_config.pin_d2       = Y4_GPIO_NUM;
-  cam_config.pin_d3       = Y5_GPIO_NUM;
-  cam_config.pin_d4       = Y6_GPIO_NUM;
-  cam_config.pin_d5       = Y7_GPIO_NUM;
-  cam_config.pin_d6       = Y8_GPIO_NUM;
-  cam_config.pin_d7       = Y9_GPIO_NUM;
-  cam_config.pin_xclk     = XCLK_GPIO_NUM;
-  cam_config.pin_pclk     = PCLK_GPIO_NUM;
-  cam_config.pin_vsync    = VSYNC_GPIO_NUM;
-  cam_config.pin_href     = HREF_GPIO_NUM;
-  cam_config.pin_sscb_sda = SIOD_GPIO_NUM;
-  cam_config.pin_sscb_scl = SIOC_GPIO_NUM;
-  cam_config.pin_pwdn     = PWDN_GPIO_NUM;
-  cam_config.pin_reset    = RESET_GPIO_NUM;
+  cam_config.pin_d0 = Y2_GPIO_NUM; cam_config.pin_d1 = Y3_GPIO_NUM;
+  cam_config.pin_d2 = Y4_GPIO_NUM; cam_config.pin_d3 = Y5_GPIO_NUM;
+  cam_config.pin_d4 = Y6_GPIO_NUM; cam_config.pin_d5 = Y7_GPIO_NUM;
+  cam_config.pin_d6 = Y8_GPIO_NUM; cam_config.pin_d7 = Y9_GPIO_NUM;
+  cam_config.pin_xclk = XCLK_GPIO_NUM; cam_config.pin_pclk = PCLK_GPIO_NUM;
+  cam_config.pin_vsync = VSYNC_GPIO_NUM; cam_config.pin_href = HREF_GPIO_NUM;
+  cam_config.pin_sscb_sda = SIOD_GPIO_NUM; cam_config.pin_sscb_scl = SIOC_GPIO_NUM;
+  cam_config.pin_pwdn = PWDN_GPIO_NUM; cam_config.pin_reset = RESET_GPIO_NUM;
 
-  cam_config.xclk_freq_hz  = XCLK_FREQ;
-  cam_config.pixel_format  = PIXFORMAT_JPEG;
-  cam_config.frame_size    = FRAME_SIZE;
-  cam_config.jpeg_quality  = JPEG_QUALITY;
-  cam_config.fb_count      = 2;    // Double buffer for smooth streaming
-  cam_config.grab_mode     = CAMERA_GRAB_LATEST;
+  cam_config.xclk_freq_hz = XCLK_FREQ;
+  cam_config.pixel_format = PIXFORMAT_JPEG;
+  cam_config.frame_size   = FRAME_SIZE;
+  cam_config.jpeg_quality = JPEG_QUALITY;
+  cam_config.fb_count     = 2;
+  cam_config.grab_mode    = CAMERA_GRAB_LATEST;
 
-  // Initialize camera
   esp_err_t err = esp_camera_init(&cam_config);
   if (err != ESP_OK) {
-    Serial.print("CAM:INIT FAILED — error 0x");
-    Serial.println(err, HEX);
-    delay(1000);
-    ESP.restart();
+    Serial.println("CAM:INIT FAILED");
+    delay(1000); ESP.restart();
   }
 
-  // Tune sensor settings after init
   sensor_t* s = esp_camera_sensor_get();
   if (s != NULL) {
-    s->set_brightness(s, 0);      // -2 to 2
-    s->set_contrast(s, 0);        // -2 to 2
-    s->set_saturation(s, 0);      // -2 to 2
-    s->set_whitebal(s, 1);        // white balance auto
-    s->set_awb_gain(s, 1);        // auto white balance gain
-    s->set_exposure_ctrl(s, 1);   // auto exposure
-    s->set_aec2(s, 0);
-    s->set_gain_ctrl(s, 1);       // auto gain
-    s->set_agc_gain(s, 0);
-    s->set_gainceiling(s, (gainceiling_t)2);
-    s->set_bpc(s, 0);
-    s->set_wpc(s, 1);
+    s->set_whitebal(s, 1);
+    s->set_awb_gain(s, 1);
+    s->set_exposure_ctrl(s, 1);
+    s->set_gain_ctrl(s, 1);
   }
-
   Serial.println("CAM:Camera initialized OK");
 }
 
-// ─────────────────────────────────────────────────────────────────
-// WI-FI CONNECTION
-// ─────────────────────────────────────────────────────────────────
 void connectWiFi() {
   Serial.print("CAM:Connecting to SSID: ");
   Serial.println(WIFI_SSID);
-
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -162,77 +105,39 @@ void connectWiFi() {
       ESP.restart();
     }
   }
-
   Serial.println();
-  Serial.print("CAM:Connected — IP: ");
-  Serial.println(WiFi.localIP());
   Serial.print("CAM:Stream URL: http://");
   Serial.print(WiFi.localIP());
   Serial.println("/stream");
 }
 
-// ─────────────────────────────────────────────────────────────────
-// HTTP STREAM SERVER
-// ─────────────────────────────────────────────────────────────────
 void startStreamServer() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port    = STREAM_PORT;
   config.max_uri_handlers = 4;
 
-  // "/stream" endpoint
   httpd_uri_t stream_uri = {
-    .uri       = "/stream",
-    .method    = HTTP_GET,
-    .handler   = stream_handler,
-    .user_ctx  = NULL
+    .uri = "/stream", .method = HTTP_GET, .handler = stream_handler, .user_ctx = NULL
   };
-
   if (httpd_start(&stream_httpd, &config) == ESP_OK) {
     httpd_register_uri_handler(stream_httpd, &stream_uri);
-    Serial.println("CAM:HTTP stream server started on port 80");
-  } else {
-    Serial.println("CAM:Failed to start HTTP server");
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// SETUP
-// ─────────────────────────────────────────────────────────────────
 void setup() {
-  // NOTE: Serial on ESP32-CAM uses GPIO1/GPIO3 which are also
-  // the UART pins for Dev Kit bridge. USB is shared.
-  // Disconnect USB FTDI programmer before connecting to Dev Kit.
   Serial.begin(115200);
   Serial.println("AUTONIX CAM -- Starting...");
-
   initCamera();
   connectWiFi();
   startStreamServer();
-
-  Serial.println("AUTONIX CAM -- Stream live");
 }
 
-// ─────────────────────────────────────────────────────────────────
-// LOOP
-// ─────────────────────────────────────────────────────────────────
 void loop() {
-  // Listen for messages from Dev Kit over UART
   if (Serial.available()) {
     String msg = Serial.readStringUntil('\n');
     msg.trim();
-
-    if (msg == "FIRE_DETECTED") {
-      // Optional: could switch to higher frame rate here
-      Serial.println("CAM:Fire mode activated");
-    }
-    else if (msg == "FIRE_OUT") {
-      Serial.println("CAM:Returning to normal mode");
-    }
-    else if (msg.length() > 0) {
-      Serial.print("CAM:Received: ");
-      Serial.println(msg);
-    }
+    if (msg == "FIRE_DETECTED") Serial.println("CAM:Fire mode activated");
+    else if (msg == "FIRE_OUT") Serial.println("CAM:Returning to normal mode");
   }
-
   delay(10);
 }

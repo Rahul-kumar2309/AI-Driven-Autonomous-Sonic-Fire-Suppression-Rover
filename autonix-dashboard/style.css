@@ -130,6 +130,7 @@ html, body {
   gap: 12px;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* ── PANELS (Vision Feed & 3D Canvas) ──────────────────────────── */
@@ -159,6 +160,9 @@ html, body {
 /* ── VISION FEED PANEL ─────────────────────────────────────────── */
 #panel-vision {
   padding: 0;
+  min-height: 240px;
+  overflow: hidden;
+  position: relative;
 }
 
 #panel-vision .panel-content {
@@ -166,6 +170,9 @@ html, body {
   position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #050505;
   min-height: 0;
 }
 
@@ -258,6 +265,8 @@ html, body {
 /* ── 3D PANEL ──────────────────────────────────────────────────── */
 #panel-3d {
   padding: 0;
+  min-height: 280px;
+  overflow: hidden;
 }
 
 #webgl-canvas {
@@ -597,3 +606,54 @@ html, body {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
 }
+
+#live-cam-feed {
+  max-width:    100%;
+  max-height:   100%;
+  aspect-ratio: 4 / 3;
+  object-fit:   contain;
+  object-position: center;
+  background:   #050505;
+  border-radius:4px;
+  display:      none;
+}
+
+#stream-offline-msg {
+  position:        absolute;
+  inset:           0;
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  justify-content: center;
+  gap:             8px;
+  pointer-events:  none;
+  background:      #0d0d0d;
+  border-radius:   6px;
+  z-index:         1;
+}
+
+#audio-waveform {
+  width:      100% !important;
+  height:     48px !important;
+  min-height: 48px;
+  max-height: 48px;
+  display:    block;
+  flex-shrink:0;
+}
+
+@media (max-height: 768px) {
+  #panel-vision {
+    min-height: 180px;
+  }
+  #panel-3d {
+    min-height: 200px;
+  }
+}
+
+@media (max-width: 1200px) {
+  #live-cam-feed {
+    aspect-ratio: auto;
+    object-fit:   contain;
+  }
+}
+
